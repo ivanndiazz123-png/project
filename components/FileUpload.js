@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Upload, FileCode, X, Loader2, Type } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export default function FileUpload({ onFileUploaded }) {
   const [dragActive, setDragActive] = useState(false);
@@ -24,7 +25,7 @@ export default function FileUpload({ onFileUploaded }) {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
+    
     if (e.dataTransfer.files?.[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -38,7 +39,14 @@ export default function FileUpload({ onFileUploaded }) {
 
   const handleFile = (selectedFile) => {
     if (!selectedFile.name.endsWith('.java')) {
-      alert('Please upload a .java file');
+      Swal.fire({
+        title: 'Invalid File',
+        text: 'Please upload a .java file only',
+        icon: 'warning',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
       return;
     }
     setFile(selectedFile);
@@ -57,7 +65,7 @@ export default function FileUpload({ onFileUploaded }) {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const content = e.target.result;
-
+        
         const res = await fetch('/api/files', {
           method: 'POST',
           headers: {
@@ -77,11 +85,27 @@ export default function FileUpload({ onFileUploaded }) {
           setFile(null);
           setTitle('');
           onFileUploaded();
+        } else {
+          Swal.fire({
+            title: 'Upload Failed',
+            text: data.message || 'Something went wrong',
+            icon: 'error',
+            background: '#064e3b',
+            color: '#d1fae5',
+            confirmButtonColor: '#059669',
+          });
         }
       };
       reader.readAsText(file);
     } catch (error) {
-      console.error('Upload failed:', error);
+      Swal.fire({
+        title: 'Error',
+        text: 'Upload failed. Please try again.',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
     } finally {
       setUploading(false);
     }
@@ -155,7 +179,7 @@ export default function FileUpload({ onFileUploaded }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-
+          
           <button
             onClick={handleUpload}
             disabled={uploading || !title.trim()}

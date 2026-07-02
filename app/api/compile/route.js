@@ -23,7 +23,7 @@ export async function POST(request) {
       );
     }
 
-    const file = getFileById(fileId);
+    const file = await getFileById(fileId);
     if (!file || file.userId !== user.userId) {
       return NextResponse.json(
         { success: false, message: 'File not found' },
@@ -33,7 +33,7 @@ export async function POST(request) {
 
     const result = await compileJava(file.content, file.filename);
 
-    updateFile(fileId, {
+    await updateFile(fileId, {
       output: result,
       status: result.success ? 'compiled' : 'error',
     });
@@ -45,7 +45,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Compilation error:', error);
     return NextResponse.json(
-      { success: false, message: 'Compilation failed' },
+      { success: false, message: 'Compilation failed: ' + error.message },
       { status: 500 }
     );
   }

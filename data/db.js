@@ -1,263 +1,385 @@
-'use client';
+import mongoose from 'mongoose';
+import connectDB from '@/lib/mongodb';
 
-import { useState } from 'react';
-import JavaOutput from './JavaOutput';
-import Swal from 'sweetalert2';
-import toast from 'react-hot-toast';
-import { 
-  FileCode, 
-  Clock, 
-  Play, 
-  Trash2, 
-  ChevronDown, 
-  ChevronUp,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Code,
-  Copy,
-  Download,
-  Heart
-} from 'lucide-react';
+// Define schemas directly here
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  nickname: { type: String, required: true },
+  password: { type: String, required: true },
+  bio: { type: String, default: '' },
+  avatar: { type: String, default: '' },
+  role: { type: String, default: 'student' },
+  theme: { type: String, default: 'green' },
+  notifications: { type: Boolean, default: true },
+  filesCount: { type: Number, default: 0 },
+  totalCompiles: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  lastActive: { type: Date, default: Date.now }
+});
 
-export default function FileCard({ file, onDelete, onFavorite }) {
-  const [expanded, setExpanded] = useState(false);
-  const [compiling, setCompiling] = useState(false);
-  const [output, setOutput] = useState(file.output);
-  const [showOutput, setShowOutput] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [isFav, setIsFav] = useState(file.isFavorite);
+const FileSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  filename: { type: String, required: true },
+  content: { type: String, required: true },
+  size: { type: Number, default: 0 },
+  status: { type: String, default: 'pending' },
+  output: { type: mongoose.Schema.Types.Mixed, default: null },
+  compileCount: { type: Number, default: 0 },
+  isFavorite: { type: Boolean, default: false },
+  tags: [{ type: String }],
+  uploadedAt: { type: Date, default: Date.now },
+  compiledAt: { type: Date, default: null }
+});
 
-  const handleCompile = async () => {
-    if (compiling) return;
-    setCompiling(true);
-    
-    const token = localStorage.getItem('token');
-    
-    try {
-      const res = await fetch('/api/compile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ fileId: file.id }),
-      });
+// Cache models
+let UserModel = null;
+let FileModel = null;
 
-      const data = await res.json();
+async function getModels() {
+  await connectDB();
+  if (!UserModel) {
+    UserModel = mongoose.models.User || mongoose.model('User', UserSchema);
+  }
+  if (!FileModel) {
+    FileModel = mongoose.models.File || mongoose.model('File', FileSchema);
+  }
+  return { User: UserModel, File: FileModel };
+}
 
-      if (data.success) {
-        setOutput(data.result);
-        setShowOutput(true);
-        toast.success('Compilation successful!');
-      } else {
-        toast.error(data.message || 'Compilation failed');
-      }
-    } catch (error) {
-      console.error('Compilation request failed:', error);
-      toast.error('Compilation error: ' + error.message);
-    } finally {
-      setCompiling(false);
-    }
-  };
+// ==================== USER FUNCTIONS ====================
 
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(file.content || '');
-      setCopied(true);
-      toast.success('Code copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast.error('Failed to copy');
-    }
-  };
+export async function getUsers() {
+  try {
+    const { User } = await getModels();
+    return await User.find().lean();
+  } catch (error) {
+    console.error('getUsers error:', error.message);
+    return [];
+  }
+}
 
-  const handleDownload = () => {
-    const blob = new Blob([file.content || ''], { type: 'text/java' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    toast.success('File downloaded!');
-  };
+export async function getUserByUsername(username) {
+  try {
+    const { User } = await getModels();
+    return await User.findOne({ username: username.toLowerCase() }).lean();
+  } catch (error) {
+    console.error('getUserByUsername error:', error.message);
+    return null;
+  }
+}
 
-  const handleDelete = async () => {
-    const result = await Swal.fire({
-      title: 'Delete File?',
-      text: `Are you sure you want to delete "${file.title}"?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it!',
-      cancelButtonText: 'Cancel',
-      background: '#064e3b',
-      color: '#d1fae5',
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#059669',
+export async function getUserById(id) {
+  try {
+    const { User } = await getModels();
+    return await User.findById(id).lean();
+  } catch (error) {
+    console.error('getUserById error:', error.message);
+    return null;
+  }
+}
+
+export async function createUser(userData) {
+  try {
+    const { User } = await getModels();
+    const newUser = new User({
+      username: userData.username.toLowerCase(),
+      nickname: userData.nickname,
+      password: userData.password,
+      bio: '',
+      avatar: '',
+      role: 'student',
+      theme: 'green',
+      notifications: true,
+      filesCount: 0,
+      totalCompiles: 0,
+      createdAt: new Date(),
+      lastActive: new Date()
     });
+    const saved = await newUser.save();
+    return saved.toObject();
+  } catch (error) {
+    console.error('createUser error:', error.message);
+    throw error;
+  }
+}
 
-    if (result.isConfirmed) {
-      onDelete();
-    }
-  };
+export async function updateUser(id, updates) {
+  try {
+    const { User } = await getModels();
+    const user = await User.findByIdAndUpdate(
+      id,
+      { ...updates, lastActive: new Date() },
+      { new: true }
+    ).lean();
+    
+    if (!user) return null;
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } catch (error) {
+    console.error('updateUser error:', error.message);
+    return null;
+  }
+}
 
-  const handleFavorite = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('/api/files', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ fileId: file.id, action: 'favorite' }),
-      });
+// ==================== FILE FUNCTIONS ====================
 
-      const data = await res.json();
-      if (data.success) {
-        setIsFav(!isFav);
-        onFavorite?.();
-        toast.success(isFav ? 'Removed from favorites' : 'Added to favorites');
-      } else {
-        toast.error(data.message || 'Failed to update');
-      }
-    } catch (error) {
-      console.error('Favorite error:', error);
-      toast.error('Failed to update favorite');
-    }
-  };
+export async function getFiles(userId) {
+  try {
+    const { File } = await getModels();
+    return await File.find({ userId }).sort({ uploadedAt: -1 }).lean();
+  } catch (error) {
+    console.error('getFiles error:', error.message);
+    return [];
+  }
+}
 
-  const formatTime = (dateString) => {
-    if (!dateString) return 'Unknown';
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
+export async function getFileById(id) {
+  try {
+    const { File } = await getModels();
+    return await File.findById(id).lean();
+  } catch (error) {
+    console.error('getFileById error:', error.message);
+    return null;
+  }
+}
+
+export async function createFile(fileData) {
+  try {
+    const { User, File } = await getModels();
+    const newFile = new File({
+      userId: fileData.userId,
+      title: fileData.title,
+      filename: fileData.filename,
+      content: fileData.content,
+      size: fileData.size || 0,
+      status: 'pending',
+      compileCount: 0,
+      isFavorite: false,
+      tags: fileData.tags || [],
+      uploadedAt: new Date(),
+      compiledAt: null
     });
-  };
+    const saved = await newFile.save();
+    
+    await User.findByIdAndUpdate(fileData.userId, {
+      $inc: { filesCount: 1 }
+    });
+    
+    return saved.toObject();
+  } catch (error) {
+    console.error('createFile error:', error.message);
+    throw error;
+  }
+}
 
-  const getStatusIcon = () => {
-    if (file.status === 'compiled' || output?.success) {
-      return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+export async function updateFile(id, updates) {
+  try {
+    const { File } = await getModels();
+    const file = await File.findByIdAndUpdate(
+      id,
+      { ...updates, compiledAt: new Date() },
+      { new: true }
+    ).lean();
+    
+    if (file && updates.status === 'compiled') {
+      await File.findByIdAndUpdate(id, { $inc: { compileCount: 1 } });
+      file.compileCount = (file.compileCount || 0) + 1;
     }
-    if (file.status === 'error') {
-      return <XCircle className="w-4 h-4 text-red-400" />;
+    
+    return file;
+  } catch (error) {
+    console.error('updateFile error:', error.message);
+    return null;
+  }
+}
+
+export async function deleteFile(id) {
+  try {
+    const { User, File } = await getModels();
+    const file = await File.findById(id).lean();
+    if (file) {
+      await User.findByIdAndUpdate(file.userId, {
+        $inc: { filesCount: -1 }
+      });
+      await File.findByIdAndDelete(id);
     }
-    return <Clock className="w-4 h-4 text-emerald-400/50" />;
-  };
+  } catch (error) {
+    console.error('deleteFile error:', error.message);
+  }
+}
 
-  return (
-    <div className="glass-card overflow-hidden animate-fade-in">
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-emerald-600/15 flex items-center justify-center shrink-0">
-              <FileCode className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-semibold text-emerald-100 truncate">{file.title}</h3>
-              <p className="text-xs text-emerald-400/50">{file.filename}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={handleFavorite}
-              className={`p-1.5 rounded-lg transition-colors ${isFav ? 'text-yellow-400 bg-yellow-400/10' : 'text-emerald-400/40 hover:text-yellow-400 hover:bg-yellow-400/10'}`}
-            >
-              <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
-            </button>
-            {getStatusIcon()}
-          </div>
-        </div>
+export async function toggleFavorite(id) {
+  try {
+    const { File } = await getModels();
+    const file = await File.findById(id).lean();
+    if (!file) return null;
+    
+    const updated = await File.findByIdAndUpdate(
+      id,
+      { isFavorite: !file.isFavorite },
+      { new: true }
+    ).lean();
+    
+    return updated;
+  } catch (error) {
+    console.error('toggleFavorite error:', error.message);
+    return null;
+  }
+}
 
-        <div className="flex items-center gap-4 text-xs text-emerald-400/40 mb-4">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {formatTime(file.uploadedAt)}
-          </span>
-          <span>{(file.size / 1024).toFixed(1)} KB</span>
-          {file.compileCount > 0 && (
-            <span className="flex items-center gap-1">
-              <Play className="w-3 h-3" />
-              {file.compileCount} runs
-            </span>
-          )}
-        </div>
+export async function searchFiles(userId, query) {
+  try {
+    const files = await getFiles(userId);
+    if (!query) return files;
+    
+    const lowerQuery = query.toLowerCase();
+    return files.filter(f => 
+      f.title.toLowerCase().includes(lowerQuery) ||
+      f.filename.toLowerCase().includes(lowerQuery) ||
+      (f.tags && f.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
+    );
+  } catch (error) {
+    console.error('searchFiles error:', error.message);
+    return [];
+  }
+}
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCompile}
-            disabled={compiling}
-            className="flex-1 glass-button flex items-center justify-center gap-2 py-2 text-sm disabled:opacity-50"
-          >
-            {compiling ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Compiling...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                {output ? 'Recompile' : 'Compile & Run'}
-              </>
-            )}
-          </button>
-          
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="glass-button-secondary p-2"
-            title="View source code"
-          >
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-          
-          <button
-            onClick={handleDelete}
-            className="p-2 rounded-lg hover:bg-red-500/10 text-emerald-400/60 hover:text-red-400 transition-colors"
-            title="Delete file"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+export async function getFilesByDate(userId) {
+  try {
+    const files = await getFiles(userId);
+    const grouped = {};
+    
+    files.forEach(file => {
+      const date = new Date(file.uploadedAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(file);
+    });
+    
+    return Object.entries(grouped)
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+      .reduce((acc, [date, files]) => {
+        acc[date] = files;
+        return acc;
+      }, {});
+  } catch (error) {
+    console.error('getFilesByDate error:', error.message);
+    return {};
+  }
+}
 
-      {expanded && (
-        <div className="border-t border-emerald-400/10 p-4 bg-emerald-950/30">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Code className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-300">Source Code</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyCode}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-button-secondary text-xs"
-              >
-                {copied ? <CheckCircle className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <button
-                onClick={handleDownload}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg glass-button-secondary text-xs"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Download
-              </button>
-            </div>
-          </div>
-          <pre className="code-block p-4 rounded-lg overflow-x-auto text-xs max-h-64 scrollbar-green">
-            <code className="text-emerald-300/80">{file.content || '// No content'}</code>
-          </pre>
-        </div>
-      )}
+export async function getStats(userId) {
+  try {
+    const files = await getFiles(userId);
+    const user = await getUserById(userId);
+    
+    return {
+      totalFiles: files.length,
+      compiledFiles: files.filter(f => f.status === 'compiled').length,
+      totalCompiles: files.reduce((acc, f) => acc + (f.compileCount || 0), 0),
+      favoriteFiles: files.filter(f => f.isFavorite).length,
+      totalSize: files.reduce((acc, f) => acc + (f.size || 0), 0),
+      lastUpload: files.length > 0 ? files[files.length - 1].uploadedAt : null,
+      userSince: user?.createdAt
+    };
+  } catch (error) {
+    console.error('getStats error:', error.message);
+    return {
+      totalFiles: 0,
+      compiledFiles: 0,
+      totalCompiles: 0,
+      favoriteFiles: 0,
+      totalSize: 0,
+      lastUpload: null,
+      userSince: null
+    };
+  }
+}
 
-      {showOutput && output && (
-        <div className="border-t border-emerald-400/10">
-          <JavaOutput output={output} onClose={() => setShowOutput(false)} />
-        </div>
-      )}
-    </div>
-  );
+export async function getPublicProfile(username) {
+  try {
+    const { User, File } = await getModels();
+    const user = await User.findOne({ username: username.toLowerCase() }).lean();
+    if (!user) return null;
+    
+    const userId = user._id.toString();
+    const { password, ...safeUser } = user;
+    
+    const files = await File.find({ userId })
+      .sort({ uploadedAt: -1 })
+      .limit(5)
+      .lean();
+    
+    const totalFiles = await File.countDocuments({ userId });
+    const compiledFiles = await File.countDocuments({ userId, status: 'compiled' });
+    const favoriteFiles = await File.countDocuments({ userId, isFavorite: true });
+    
+    return {
+      ...safeUser,
+      id: userId,
+      stats: {
+        totalFiles,
+        compiledFiles,
+        totalCompiles: files.reduce((acc, f) => acc + (f.compileCount || 0), 0),
+        favoriteFiles,
+      },
+      recentFiles: files.map(f => ({
+        id: f._id.toString(),
+        title: f.title,
+        filename: f.filename,
+        uploadedAt: f.uploadedAt,
+        status: f.status,
+        compileCount: f.compileCount || 0
+      }))
+    };
+  } catch (error) {
+    console.error('getPublicProfile error:', error.message);
+    return null;
+  }
+}
+
+export async function exportDatabase() {
+  try {
+    const { User, File } = await getModels();
+    const users = await User.find().lean();
+    const files = await File.find().lean();
+    
+    return JSON.stringify({
+      users: users.map(u => ({ ...u, _id: u._id.toString() })),
+      files: files.map(f => ({ ...f, _id: f._id.toString() }))
+    }, null, 2);
+  } catch (error) {
+    console.error('exportDatabase error:', error.message);
+    throw error;
+  }
+}
+
+export async function importDatabase(jsonString) {
+  try {
+    const data = JSON.parse(jsonString);
+    if (!data.users || !data.files) return false;
+    
+    const { User, File } = await getModels();
+    await User.deleteMany({});
+    await File.deleteMany({});
+    
+    for (const user of data.users) {
+      delete user._id;
+      await User.create(user);
+    }
+    
+    for (const file of data.files) {
+      delete file._id;
+      await File.create(file);
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('Import error:', e.message);
+    return false;
+  }
 }

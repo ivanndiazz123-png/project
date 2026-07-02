@@ -11,6 +11,6 @@ export async function GET(request) {
     );
   }
 
-  const stats = getStats(user.userId);
+  const stats = await getStats(user.userId);
   return NextResponse.json({ success: true, stats });
 }

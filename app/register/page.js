@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Terminal, Eye, EyeOff, ArrowLeft, Loader2, User, CheckCircle } from 'lucide-react';
+import Swal from 'sweetalert2';
+import { Terminal, Eye, EyeOff, ArrowLeft, Loader2, User } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,22 +16,33 @@ export default function RegisterPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      Swal.fire({
+        title: 'Error',
+        text: 'Passwords do not match',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
       setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      Swal.fire({
+        title: 'Error',
+        text: 'Password must be at least 6 characters',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
       setLoading(false);
       return;
     }
@@ -45,29 +57,38 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (data.success) {
-        setSuccess(true);
-        setTimeout(() => router.push('/login'), 2000);
+        await Swal.fire({
+          title: 'Account Created!',
+          text: 'Your account has been created successfully. Please sign in.',
+          icon: 'success',
+          background: '#064e3b',
+          color: '#d1fae5',
+          confirmButtonColor: '#059669',
+        });
+        router.push('/login');
       } else {
-        setError(data.message || 'Registration failed');
+        Swal.fire({
+          title: 'Registration Failed',
+          text: data.message || 'Something went wrong',
+          icon: 'error',
+          background: '#064e3b',
+          color: '#d1fae5',
+          confirmButtonColor: '#059669',
+        });
       }
     } catch (err) {
-      setError('Connection failed. Please try again.');
+      Swal.fire({
+        title: 'Error',
+        text: 'Connection failed. Please try again.',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
     } finally {
       setLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6">
-        <div className="liquid-glass p-10 text-center max-w-md w-full animate-fade-in">
-          <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-emerald-100 mb-2">Account Created!</h2>
-          <p className="text-emerald-300/60">Redirecting to login...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden">
@@ -90,12 +111,6 @@ export default function RegisterPage() {
             <h1 className="text-2xl font-bold text-emerald-100">Create Account</h1>
             <p className="text-emerald-300/60 mt-2">Join our Java developer community</p>
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

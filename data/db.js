@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import connectDB from '@/lib/mongodb';
 
-// Define schemas directly in this file to avoid import issues
+// Define schemas directly here - NO external imports
 const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   nickname: { type: String, required: true },
@@ -32,18 +32,21 @@ const FileSchema = new mongoose.Schema({
   compiledAt: { type: Date, default: null }
 });
 
-// Get or create models
-const getModels = async () => {
+// Helper to get models after connection
+const getUserModel = async () => {
   await connectDB();
-  const User = mongoose.models.User || mongoose.model('User', UserSchema);
-  const File = mongoose.models.File || mongoose.model('File', FileSchema);
-  return { User, File };
+  return mongoose.models.User || mongoose.model('User', UserSchema);
+};
+
+const getFileModel = async () => {
+  await connectDB();
+  return mongoose.models.File || mongoose.model('File', FileSchema);
 };
 
 // User operations
 export async function getUsers() {
   try {
-    const { User } = await getModels();
+    const User = await getUserModel();
     return User.find().lean();
   } catch (error) {
     console.error('getUsers error:', error);
@@ -53,7 +56,7 @@ export async function getUsers() {
 
 export async function getUserByUsername(username) {
   try {
-    const { User } = await getModels();
+    const User = await getUserModel();
     return User.findOne({ username: username.toLowerCase() }).lean();
   } catch (error) {
     console.error('getUserByUsername error:', error);
@@ -63,7 +66,7 @@ export async function getUserByUsername(username) {
 
 export async function getUserById(id) {
   try {
-    const { User } = await getModels();
+    const User = await getUserModel();
     return User.findById(id).lean();
   } catch (error) {
     console.error('getUserById error:', error);
@@ -73,7 +76,7 @@ export async function getUserById(id) {
 
 export async function createUser(userData) {
   try {
-    const { User } = await getModels();
+    const User = await getUserModel();
     const newUser = new User({
       ...userData,
       username: userData.username.toLowerCase(),
@@ -97,7 +100,7 @@ export async function createUser(userData) {
 
 export async function updateUser(id, updates) {
   try {
-    const { User } = await getModels();
+    const User = await getUserModel();
     const user = await User.findByIdAndUpdate(
       id,
       { ...updates, lastActive: new Date() },
@@ -116,7 +119,7 @@ export async function updateUser(id, updates) {
 // File operations
 export async function getFiles(userId) {
   try {
-    const { File } = await getModels();
+    const File = await getFileModel();
     return File.find({ userId }).sort({ uploadedAt: -1 }).lean();
   } catch (error) {
     console.error('getFiles error:', error);
@@ -126,7 +129,7 @@ export async function getFiles(userId) {
 
 export async function getFileById(id) {
   try {
-    const { File } = await getModels();
+    const File = await getFileModel();
     return File.findById(id).lean();
   } catch (error) {
     console.error('getFileById error:', error);
@@ -136,7 +139,8 @@ export async function getFileById(id) {
 
 export async function createFile(fileData) {
   try {
-    const { User, File } = await getModels();
+    const User = await getUserModel();
+    const File = await getFileModel();
     const newFile = new File({
       ...fileData,
       status: 'pending',
@@ -161,7 +165,7 @@ export async function createFile(fileData) {
 
 export async function updateFile(id, updates) {
   try {
-    const { File } = await getModels();
+    const File = await getFileModel();
     const file = await File.findByIdAndUpdate(
       id,
       { ...updates, compiledAt: new Date() },
@@ -182,7 +186,8 @@ export async function updateFile(id, updates) {
 
 export async function deleteFile(id) {
   try {
-    const { User, File } = await getModels();
+    const User = await getUserModel();
+    const File = await getFileModel();
     const file = await File.findById(id).lean();
     if (file) {
       await User.findByIdAndUpdate(file.userId, {
@@ -197,7 +202,7 @@ export async function deleteFile(id) {
 
 export async function toggleFavorite(id) {
   try {
-    const { File } = await getModels();
+    const File = await getFileModel();
     const file = await File.findById(id).lean();
     if (!file) return null;
     
@@ -287,10 +292,10 @@ export async function getStats(userId) {
   }
 }
 
-// Public profile data (no sensitive info)
 export async function getPublicProfile(username) {
   try {
-    const { User, File } = await getModels();
+    const User = await getUserModel();
+    const File = await getFileModel();
     const user = await User.findOne({ username: username.toLowerCase() }).lean();
     if (!user) return null;
     
@@ -330,10 +335,10 @@ export async function getPublicProfile(username) {
   }
 }
 
-// Backup / Restore
 export async function exportDatabase() {
   try {
-    const { User, File } = await getModels();
+    const User = await getUserModel();
+    const File = await getFileModel();
     const users = await User.find().lean();
     const files = await File.find().lean();
     
@@ -352,7 +357,8 @@ export async function importDatabase(jsonString) {
     const data = JSON.parse(jsonString);
     if (!data.users || !data.files) return false;
     
-    const { User, File } = await getModels();
+    const User = await getUserModel();
+    const File = await getFileModel();
     await User.deleteMany({});
     await File.deleteMany({});
     

@@ -14,7 +14,8 @@ import {
   Award,
   Loader2,
   Zap,
-  Target
+  Target,
+  Check
 } from 'lucide-react';
 
 export default function StatsPage() {
@@ -32,7 +33,13 @@ export default function StatsPage() {
       return;
     }
     
-    setUser(JSON.parse(userData));
+    try {
+      setUser(JSON.parse(userData));
+    } catch {
+      router.push('/login');
+      return;
+    }
+    
     fetchStats(token);
   }, [router]);
 
@@ -50,6 +57,11 @@ export default function StatsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSuccessRate = () => {
+    if (!stats || !stats.totalFiles || stats.totalFiles === 0) return '0%';
+    return `${Math.round((stats.compiledFiles / stats.totalFiles) * 100)}%`;
   };
 
   if (loading) {
@@ -92,7 +104,7 @@ export default function StatsPage() {
           <StatCard 
             icon={TrendingUp} 
             label="Success Rate" 
-            value={`${stats?.totalFiles ? ((stats.compiledFiles / stats.totalFiles) * 100).toFixed(0) : 0}%`}
+            value={getSuccessRate()}
             color="bg-purple-500/20 text-purple-400"
           />
         </div>
@@ -151,14 +163,14 @@ export default function StatsPage() {
                     key={index} 
                     className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${isUnlocked ? 'glass-card border-emerald-400/30' : 'bg-emerald-950/30 border-emerald-400/5 opacity-50'}`}
                   >
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isUnlocked ? 'bg-emerald-500/20' : 'bg-emerald-900/20'}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isUnlocked ? 'bg-emerald-500/20' : 'bg-emerald-900/20'}`}>
                       <achievement.icon className={`w-6 h-6 ${isUnlocked ? 'text-emerald-400' : 'text-emerald-600'}`} />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <h3 className={`font-medium ${isUnlocked ? 'text-emerald-100' : 'text-emerald-400/40'}`}>{achievement.title}</h3>
                       <p className="text-xs text-emerald-400/50">{achievement.description}</p>
                     </div>
-                    {isUnlocked && <Zap className="w-5 h-5 text-yellow-400" />}
+                    {isUnlocked && <Zap className="w-5 h-5 text-yellow-400 shrink-0" />}
                   </div>
                 );
               })}
@@ -171,10 +183,13 @@ export default function StatsPage() {
 }
 
 function StatCard({ icon: Icon, label, value, color }) {
+  const bgClass = color.split(' ')[0];
+  const textClass = color.split(' ')[1];
+  
   return (
     <div className="liquid-glass p-6 text-center">
-      <div className={`w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center ${color.split(' ')[0]}`}>
-        <Icon className={`w-6 h-6 ${color.split(' ')[1]}`} />
+      <div className={`w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center ${bgClass}`}>
+        <Icon className={`w-6 h-6 ${textClass}`} />
       </div>
       <div className="text-3xl font-bold text-emerald-100 mb-1">{value}</div>
       <div className="text-sm text-emerald-400/60">{label}</div>

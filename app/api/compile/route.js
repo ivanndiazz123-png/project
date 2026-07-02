@@ -15,54 +15,33 @@ export async function POST(request) {
   }
 
   try {
-    let body;
-    try {
-      body = await request.json();
-    } catch (parseError) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid JSON body' },
-        { status: 400 }
-      );
-    }
-
+    const body = await request.json();
     const { fileId } = body;
 
-    if (!fileId) {
+    // Validate fileId
+    if (!fileId || fileId === 'undefined' || fileId === 'null') {
       return NextResponse.json(
-        { success: false, message: 'File ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate fileId is a string
-    if (typeof fileId !== 'string') {
-      return NextResponse.json(
-        { success: false, message: 'File ID must be a string' },
+        { success: false, message: 'Valid File ID required' },
         { status: 400 }
       );
     }
 
     const file = await getFileById(fileId);
-    
     if (!file) {
       return NextResponse.json(
         { success: false, message: 'File not found in database' },
         { status: 404 }
       );
     }
-
-    // Compare userId as strings
-    const fileUserId = file.userId?.toString ? file.userId.toString() : file.userId;
-    const requestUserId = user.userId?.toString ? user.userId.toString() : user.userId;
     
-    if (fileUserId !== requestUserId) {
+    if (file.userId !== user.userId) {
       return NextResponse.json(
         { success: false, message: 'File does not belong to you' },
         { status: 403 }
       );
     }
 
-    if (!file.content || file.content.trim().length === 0) {
+    if (!file.content) {
       return NextResponse.json(
         { success: false, message: 'File has no content' },
         { status: 400 }

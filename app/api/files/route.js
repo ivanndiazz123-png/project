@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createFile, getFilesByDate, deleteFile, getFileById, toggleFavorite } from '@/data/db';
 import { getAuthUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
+function isValidId(id) {
+  return id && id !== 'undefined' && id !== 'null' && typeof id === 'string' && id.length > 0;
+}
+
 export async function GET(request) {
   const user = getAuthUser(request);
   if (!user) {
@@ -80,9 +86,9 @@ export async function DELETE(request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
-  if (!id) {
+  if (!isValidId(id)) {
     return NextResponse.json(
-      { success: false, message: 'File ID required' },
+      { success: false, message: 'Valid File ID required' },
       { status: 400 }
     );
   }
@@ -111,6 +117,13 @@ export async function PATCH(request) {
   try {
     const body = await request.json();
     const { fileId, action } = body;
+
+    if (!isValidId(fileId)) {
+      return NextResponse.json(
+        { success: false, message: 'Valid File ID required' },
+        { status: 400 }
+      );
+    }
 
     if (action === 'favorite') {
       const file = await toggleFavorite(fileId);

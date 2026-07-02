@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Terminal, LogOut, User, FileCode } from 'lucide-react';
+import { Terminal, LogOut, User, FileCode, Settings, BarChart3 } from 'lucide-react';
 
 export default function Navbar({ user }) {
   const router = useRouter();
@@ -23,20 +23,30 @@ export default function Navbar({ user }) {
           <span className="text-lg font-bold text-emerald-100">JavaBackup</span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg glass-card">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard" className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg glass-button-secondary text-sm">
+            <FileCode className="w-4 h-4" />
+            <span>Files</span>
+          </Link>
+
+          <Link href="/stats" className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg glass-button-secondary text-sm">
+            <BarChart3 className="w-4 h-4" />
+            <span>Stats</span>
+          </Link>
+
+          <Link href="/profile" className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg glass-button-secondary text-sm">
+            <Settings className="w-4 h-4" />
+            <span>Profile</span>
+          </Link>
+
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg glass-card">
             <User className="w-4 h-4 text-emerald-400" />
             <span className="text-sm text-emerald-200">{user?.nickname}</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg glass-card">
-            <FileCode className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm text-emerald-200">{user?.filesCount || 0} files</span>
-          </div>
-
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg glass-button-secondary text-sm hover:bg-red-500/10 hover:text-red-300 hover:border-red-400/20 transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg glass-button-secondary text-sm hover:bg-red-500/10 hover:text-red-300 hover:border-red-400/20 transition-all"
           >
             <LogOut className="w-4 h-4" />
             <span className="hidden sm:inline">Logout</span>

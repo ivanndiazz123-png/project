@@ -17,8 +17,7 @@ import {
   Code,
   Copy,
   Download,
-  Heart,
-  Star
+  Heart
 } from 'lucide-react';
 
 export default function FileCard({ file, onDelete, onFavorite }) {
@@ -28,33 +27,61 @@ export default function FileCard({ file, onDelete, onFavorite }) {
   const [showOutput, setShowOutput] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Get file ID safely - handle both MongoDB _id and plain id
+  const getFileId = () => {
+    if (file._id) return file._id.toString ? file._id.toString() : file._id;
+    if (file.id) return file.id.toString ? file.id.toString() : file.id;
+    return null;
+  };
+
   const handleCompile = async () => {
     if (compiling) return;
-    setCompiling(true);
     
+    const fileId = getFileId();
+    if (!fileId) {
+      toast.error('File ID is missing');
+      console.error('File object:', file);
+      return;
+    }
+
+    setCompiling(true);
     const token = localStorage.getItem('token');
     
     try {
+      const requestBody = { fileId };
+      console.log('Sending compile request:', requestBody);
+      
       const res = await fetch('/api/compile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ fileId: file.id }),
+        body: JSON.stringify(requestBody),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        const text = await res.text();
+        console.error('Non-JSON response:', text);
+        toast.error('Server returned invalid response');
+        return;
+      }
+
+      console.log('Compile response:', data);
+
       if (data.success) {
         setOutput(data.result);
         setShowOutput(true);
         toast.success('Compilation successful!');
       } else {
-        toast.error('Compilation failed');
+        toast.error(data.message || 'Compilation failed');
       }
     } catch (error) {
-      console.error('Compilation failed:', error);
-      toast.error('Compilation error');
+      console.error('Compilation request failed:', error);
+      toast.error('Network error: ' + error.message);
     } finally {
       setCompiling(false);
     }
@@ -62,7 +89,7 @@ export default function FileCard({ file, onDelete, onFavorite }) {
 
   const handleCopyCode = async () => {
     try {
-      await navigator.clipboard.writeText(file.content);
+      await navigator.clipboard.writeText(file.content || '');
       setCopied(true);
       toast.success('Code copied to clipboard!');
       setTimeout(() => setCopied(false), 2000);
@@ -72,7 +99,7 @@ export default function FileCard({ file, onDelete, onFavorite }) {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([file.content], { type: 'text/java' });
+    const blob = new Blob([file.content || ''], { type: 'text/java' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -105,6 +132,12 @@ export default function FileCard({ file, onDelete, onFavorite }) {
   };
 
   const handleFavorite = async () => {
+    const fileId = getFileId();
+    if (!fileId) {
+      toast.error('File ID missing');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     try {
       const res = await fetch('/api/files', {
@@ -113,13 +146,15 @@ export default function FileCard({ file, onDelete, onFavorite }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ fileId: file.id, action: 'favorite' }),
+        body: JSON.stringify({ fileId, action: 'favorite' }),
       });
 
       const data = await res.json();
       if (data.success) {
         onFavorite?.();
         toast.success(file.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+      } else {
+        toast.error(data.message || 'Failed');
       }
     } catch (error) {
       toast.error('Failed to update favorite');
@@ -127,6 +162,7 @@ export default function FileCard({ file, onDelete, onFavorite }) {
   };
 
   const formatTime = (dateString) => {
+    if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit'
@@ -243,7 +279,7 @@ export default function FileCard({ file, onDelete, onFavorite }) {
             </div>
           </div>
           <pre className="code-block p-4 rounded-lg overflow-x-auto text-xs max-h-64 scrollbar-green">
-            <code className="text-emerald-300/80">{file.content}</code>
+            <code className="text-emerald-300/80">{file.content || '// No content'}</code>
           </pre>
         </div>
       )}

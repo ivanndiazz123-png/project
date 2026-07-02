@@ -1,20 +1,23 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PUT,DELETE,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-    ];
-  },
-};
+import { NextResponse } from 'next/server';
+import { exportDatabase } from '@/data/db';
+import { getAuthUser } from '@/lib/auth';
 
-module.exports = nextConfig;
+export async function GET(request) {
+  const user = getAuthUser(request);
+  if (!user) {
+    return NextResponse.json(
+      { success: false, message: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const data = exportDatabase();
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, message: 'Export failed' },
+      { status: 500 }
+    );
+  }
+}

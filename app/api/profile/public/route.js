@@ -13,7 +13,7 @@ export async function GET(request) {
       );
     }
 
-    const profile = getPublicProfile(username);
+    const profile = await getPublicProfile(username);
     
     if (!profile) {
       return NextResponse.json(
@@ -26,7 +26,7 @@ export async function GET(request) {
   } catch (error) {
     console.error('Public profile error:', error);
     return NextResponse.json(
-      { success: false, message: 'Server error' },
+      { success: false, message: 'Server error: ' + error.message },
       { status: 500 }
     );
   }

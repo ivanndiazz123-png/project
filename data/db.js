@@ -130,6 +130,7 @@ export async function getFiles(userId) {
 export async function getFileById(id) {
   try {
     const File = await getFileModel();
+    // Handle both string IDs and ObjectIds
     return File.findById(id).lean();
   } catch (error) {
     console.error('getFileById error:', error);

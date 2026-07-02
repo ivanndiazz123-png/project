@@ -12,6 +12,10 @@ const nextConfig = {
       },
     ];
   },
+  // Disable static optimization for API routes
+  experimental: {
+    serverComponentsExternalPackages: ['mongoose'],
+  },
 };
 
 module.exports = nextConfig;

@@ -19,7 +19,8 @@
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.3.0",
     "sweetalert2": "^11.12.0",
-    "react-hot-toast": "^2.4.1"
+    "react-hot-toast": "^2.4.1",
+    "mongoose": "^8.4.0"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.4",

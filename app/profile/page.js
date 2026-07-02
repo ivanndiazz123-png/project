@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import Navbar from '@/components/Navbar';
 import { 
   User, 
-  Shield, 
   Save, 
   Loader2, 
   Calendar,
@@ -20,9 +19,11 @@ import {
   GraduationCap,
   Code2,
   Clock,
-  Check,
-  Star,
-  BarChart3
+  Link as LinkIcon,
+  Download,
+  Upload,
+  Shield,
+  CheckCircle
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -51,14 +52,8 @@ export default function ProfilePage() {
       return;
     }
     
-    try {
-      const parsed = JSON.parse(userData);
-      setUser(parsed);
-    } catch {
-      router.push('/login');
-      return;
-    }
-    
+    const parsedUser = JSON.parse(userData);
+    setUser(parsedUser);
     fetchProfile(token);
     fetchStats(token);
   }, [router]);
@@ -69,7 +64,7 @@ export default function ProfilePage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.success && data.user) {
+      if (data.success) {
         setProfile(data.user);
         setFormData(prev => ({
           ...prev,
@@ -111,18 +106,6 @@ export default function ProfilePage() {
       return;
     }
 
-    if (formData.newPassword && formData.newPassword.length < 6) {
-      Swal.fire({
-        title: 'Error',
-        text: 'New password must be at least 6 characters',
-        icon: 'error',
-        background: '#064e3b',
-        color: '#d1fae5',
-        confirmButtonColor: '#059669',
-      });
-      return;
-    }
-
     setSaving(true);
     const token = localStorage.getItem('token');
 
@@ -148,7 +131,7 @@ export default function ProfilePage() {
 
       const data = await res.json();
 
-      if (data.success && data.user) {
+      if (data.success) {
         setProfile(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
@@ -181,15 +164,105 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCopyProfileLink = async () => {
+    if (!profile?.username) return;
+    const link = `${window.location.origin}/user/${profile.username}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Profile link copied!');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
+
+  const handleExportBackup = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('/api/backup/export', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const blob = new Blob([data.data], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `javabackup-${profile?.username}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success('Backup downloaded!');
+      }
+    } catch {
+      toast.error('Export failed');
+    }
+  };
+
+  const handleImportBackup = async () => {
+    const { value: file } = await Swal.fire({
+      title: 'Import Backup',
+      text: 'Upload your backup JSON file. This will replace all current data!',
+      input: 'file',
+      inputAttributes: {
+        accept: '.json',
+        'aria-label': 'Upload backup file'
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Import',
+      background: '#064e3b',
+      color: '#d1fae5',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#dc2626',
+    });
+
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const token = localStorage.getItem('token');
+      try {
+        const res = await fetch('/api/backup/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ data: e.target.result }),
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          Swal.fire({
+            title: 'Restored!',
+            text: 'Your data has been restored. Please refresh the page.',
+            icon: 'success',
+            background: '#064e3b',
+            color: '#d1fae5',
+          });
+        } else {
+          Swal.fire({
+            title: 'Error',
+            text: result.message || 'Invalid backup file',
+            icon: 'error',
+            background: '#064e3b',
+            color: '#d1fae5',
+          });
+        }
+      } catch {
+        toast.error('Import failed');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const getRoleBadge = () => {
-    if (!profile || !profile.role) return null;
-    
     const roles = {
       student: { color: 'bg-blue-500/20 text-blue-300 border-blue-400/30', icon: GraduationCap },
       teacher: { color: 'bg-purple-500/20 text-purple-300 border-purple-400/30', icon: BookOpen },
       admin: { color: 'bg-red-500/20 text-red-300 border-red-400/30', icon: Shield },
     };
-    const role = profile.role;
+    const role = profile?.role || 'student';
     const config = roles[role] || roles.student;
     const Icon = config.icon;
     
@@ -199,19 +272,6 @@ export default function ProfilePage() {
         {role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
-  };
-
-  const getCompilationRate = () => {
-    if (!stats || !stats.totalFiles || stats.totalFiles === 0) return '0%';
-    const rate = ((stats.compiledFiles || 0) / stats.totalFiles) * 100;
-    return `${Math.round(rate)}%`;
-  };
-
-  const getStoragePercent = () => {
-    if (!stats || !stats.totalSize) return 0;
-    const kb = stats.totalSize / 1024;
-    const maxKb = 10 * 1024;
-    return Math.min((kb / maxKb) * 100, 100);
   };
 
   if (loading) {
@@ -241,8 +301,8 @@ export default function ProfilePage() {
                     <User className="w-10 h-10 text-emerald-400" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-emerald-100">{profile?.nickname || 'User'}</h2>
-                    <p className="text-emerald-400/60">@{profile?.username || 'username'}</p>
+                    <h2 className="text-2xl font-bold text-emerald-100">{profile?.nickname}</h2>
+                    <p className="text-emerald-400/60">@{profile?.username}</p>
                     <div className="mt-2">{getRoleBadge()}</div>
                   </div>
                 </div>
@@ -258,6 +318,32 @@ export default function ProfilePage() {
               {profile?.bio && !editMode && (
                 <div className="glass-card p-4 mb-4">
                   <p className="text-emerald-300/80 text-sm leading-relaxed">{profile.bio}</p>
+                </div>
+              )}
+
+              {!editMode && (
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <button
+                    onClick={handleCopyProfileLink}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg glass-button-secondary text-sm"
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    Copy Profile Link
+                  </button>
+                  <button
+                    onClick={handleExportBackup}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg glass-button-secondary text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Backup
+                  </button>
+                  <button
+                    onClick={handleImportBackup}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg glass-button-secondary text-sm"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import Backup
+                  </button>
                 </div>
               )}
 
@@ -372,7 +458,7 @@ export default function ProfilePage() {
           <div className="space-y-6">
             <div className="liquid-glass p-6">
               <h3 className="text-lg font-semibold text-emerald-100 mb-6 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-emerald-400" />
+                <Code2 className="w-5 h-5 text-emerald-400" />
                 Your Stats
               </h3>
               
@@ -384,7 +470,7 @@ export default function ProfilePage() {
                   color="text-emerald-400"
                 />
                 <StatItem 
-                  icon={Check} 
+                  icon={CheckCircle} 
                   label="Compiled" 
                   value={stats?.compiledFiles || 0} 
                   color="text-emerald-400"
@@ -406,7 +492,7 @@ export default function ProfilePage() {
               <div className="mt-6 pt-6 border-t border-emerald-400/10">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-emerald-400 mb-1">
-                    {getCompilationRate()}
+                    {stats?.totalFiles ? ((stats.compiledFiles / stats.totalFiles) * 100).toFixed(0) : 0}%
                   </div>
                   <p className="text-xs text-emerald-400/50">Compilation Rate</p>
                 </div>
@@ -418,7 +504,7 @@ export default function ProfilePage() {
               <div className="w-full h-3 rounded-full bg-emerald-900/50 overflow-hidden">
                 <div 
                   className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${getStoragePercent()}%` }}
+                  style={{ width: `${Math.min(((stats?.totalSize || 0) / (1024 * 1024)) * 100, 100)}%` }}
                 />
               </div>
               <p className="text-xs text-emerald-400/50 mt-2">

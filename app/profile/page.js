@@ -166,8 +166,13 @@ export default function ProfilePage() {
   };
 
   const handleCopyProfileLink = async () => {
-    if (!profile?.username) return;
-    const link = `${window.location.origin}/user/${profile.username}`;
+    // Use username from profile (from API), not from localStorage
+    const usernameToUse = profile?.username || user?.username;
+    if (!usernameToUse) {
+      toast.error('Username not found');
+      return;
+    }
+    const link = `${window.location.origin}/user/${usernameToUse}`;
     try {
       await navigator.clipboard.writeText(link);
       toast.success('Profile link copied!');
@@ -188,7 +193,7 @@ export default function ProfilePage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `javabackup-${profile?.username}-${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `javabackup-${profile?.username || 'backup'}-${new Date().toISOString().split('T')[0]}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

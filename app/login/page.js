@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Swal from 'sweetalert2';
 import { Terminal, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -10,12 +11,10 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
 
     try {
       const res = await fetch('/api/auth', {
@@ -29,12 +28,37 @@ export default function LoginPage() {
       if (data.success) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        await Swal.fire({
+          title: 'Welcome Back!',
+          text: `Good to see you, ${data.user.nickname}!`,
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false,
+          background: '#064e3b',
+          color: '#d1fae5',
+        });
+        
         router.push('/dashboard');
       } else {
-        setError(data.message || 'Invalid credentials');
+        Swal.fire({
+          title: 'Login Failed',
+          text: data.message || 'Invalid credentials',
+          icon: 'error',
+          background: '#064e3b',
+          color: '#d1fae5',
+          confirmButtonColor: '#059669',
+        });
       }
     } catch (err) {
-      setError('Connection failed. Please try again.');
+      Swal.fire({
+        title: 'Error',
+        text: 'Connection failed. Please try again.',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
     } finally {
       setLoading(false);
     }
@@ -61,12 +85,6 @@ export default function LoginPage() {
             <h1 className="text-2xl font-bold text-emerald-100">Welcome Back</h1>
             <p className="text-emerald-300/60 mt-2">Sign in to access your Java files</p>
           </div>
-
-          {error && (
-            <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

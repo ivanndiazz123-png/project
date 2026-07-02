@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser, getUserByUsername, updateUser } from '@/data/db';
+import { createUser, getUserByUsername } from '@/data/db';
 import { hashPassword, verifyPassword, generateToken } from '@/lib/auth';
 
 export async function POST(request) {
@@ -8,7 +8,7 @@ export async function POST(request) {
     const { action, username, password, nickname } = body;
 
     if (action === 'register') {
-      const existingUser = getUserByUsername(username);
+      const existingUser = await getUserByUsername(username);
       if (existingUser) {
         return NextResponse.json(
           { success: false, message: 'Username already taken' },
@@ -17,7 +17,7 @@ export async function POST(request) {
       }
 
       const hashedPassword = await hashPassword(password);
-      const user = createUser({
+      const user = await createUser({
         username,
         nickname,
         password: hashedPassword,
@@ -33,7 +33,7 @@ export async function POST(request) {
     }
 
     if (action === 'login') {
-      const user = getUserByUsername(username);
+      const user = await getUserByUsername(username);
       if (!user) {
         return NextResponse.json(
           { success: false, message: 'Invalid username or password' },
@@ -49,7 +49,7 @@ export async function POST(request) {
         );
       }
 
-      updateUser(user.id, { lastActive: new Date().toISOString() });
+      await import('@/data/db').then(m => m.updateUser(user._id.toString(), { lastActive: new Date().toISOString() }));
 
       const token = generateToken(user);
       const { password: _, ...userWithoutPassword } = user;
@@ -68,7 +68,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json(
-      { success: false, message: 'Server error' },
+      { success: false, message: 'Server error: ' + error.message },
       { status: 500 }
     );
   }

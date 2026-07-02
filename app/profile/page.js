@@ -23,7 +23,8 @@ import {
   Download,
   Upload,
   Shield,
-  CheckCircle
+  CheckCircle2,
+  Star
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -470,7 +471,7 @@ export default function ProfilePage() {
                   color="text-emerald-400"
                 />
                 <StatItem 
-                  icon={CheckCircle} 
+                  icon={CheckCircle2} 
                   label="Compiled" 
                   value={stats?.compiledFiles || 0} 
                   color="text-emerald-400"

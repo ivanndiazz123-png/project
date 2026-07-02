@@ -12,7 +12,9 @@ import {
   Calendar,
   Clock,
   Award,
-  Loader2
+  Loader2,
+  Zap,
+  Target
 } from 'lucide-react';
 
 export default function StatsPage() {
@@ -68,7 +70,6 @@ export default function StatsPage() {
           Statistics Dashboard
         </h1>
 
-        {/* Main Stats Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           <StatCard 
             icon={FileCode} 
@@ -96,7 +97,6 @@ export default function StatsPage() {
           />
         </div>
 
-        {/* Detailed Stats */}
         <div className="grid lg:grid-cols-2 gap-6">
           <div className="liquid-glass p-8">
             <h2 className="text-xl font-semibold text-emerald-100 mb-6 flex items-center gap-2">
@@ -137,7 +137,6 @@ export default function StatsPage() {
             </div>
           </div>
 
-          {/* Achievements */}
           <div className="liquid-glass p-8">
             <h2 className="text-xl font-semibold text-emerald-100 mb-6 flex items-center gap-2">
               <Award className="w-5 h-5 text-emerald-400" />
@@ -159,4 +158,53 @@ export default function StatsPage() {
                       <h3 className={`font-medium ${isUnlocked ? 'text-emerald-100' : 'text-emerald-400/40'}`}>{achievement.title}</h3>
                       <p className="text-xs text-emerald-400/50">{achievement.description}</p>
                     </div>
-                   
+                    {isUnlocked && <Zap className="w-5 h-5 text-yellow-400" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, color }) {
+  return (
+    <div className="liquid-glass p-6 text-center">
+      <div className={`w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center ${color.split(' ')[0]}`}>
+        <Icon className={`w-6 h-6 ${color.split(' ')[1]}`} />
+      </div>
+      <div className="text-3xl font-bold text-emerald-100 mb-1">{value}</div>
+      <div className="text-sm text-emerald-400/60">{label}</div>
+    </div>
+  );
+}
+
+const achievements = [
+  {
+    icon: FileCode,
+    title: 'First Steps',
+    description: 'Upload your first Java file',
+    check: (stats) => (stats?.totalFiles || 0) >= 1
+  },
+  {
+    icon: Target,
+    title: 'Code Runner',
+    description: 'Compile 5 files successfully',
+    check: (stats) => (stats?.compiledFiles || 0) >= 5
+  },
+  {
+    icon: Star,
+    title: 'Collector',
+    description: 'Save 3 files to favorites',
+    check: (stats) => (stats?.favoriteFiles || 0) >= 3
+  },
+  {
+    icon: Zap,
+    title: 'Power User',
+    description: 'Upload 10 files',
+    check: (stats) => (stats?.totalFiles || 0) >= 10
+  }
+];

@@ -12,11 +12,11 @@ export async function GET(request) {
   }
 
   try {
-    const data = exportDatabase();
+    const data = await exportDatabase();
     return NextResponse.json({ success: true, data });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: 'Export failed' },
+      { success: false, message: 'Export failed: ' + error.message },
       { status: 500 }
     );
   }

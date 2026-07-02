@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import Navbar from '@/components/Navbar';
 import FileUpload from '@/components/FileUpload';
 import SearchFilter from '@/components/SearchFilter';
 import FileCard from '@/components/FileCard';
-import { Loader2, Calendar, FileCode } from 'lucide-react';
+import { Loader2, Calendar, FileCode, Star } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -15,23 +16,25 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [showFavorites, setShowFavorites] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-
+    
     if (!token || !userData) {
       router.push('/login');
       return;
     }
-
+    
     setUser(JSON.parse(userData));
     fetchFiles(token);
   }, [router]);
 
-  const fetchFiles = async (token) => {
+  const fetchFiles = async (token, favorites = false) => {
     try {
-      const res = await fetch('/api/files', {
+      const url = favorites ? '/api/files?favorites=true' : '/api/files';
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -47,7 +50,16 @@ export default function DashboardPage() {
 
   const handleFileUploaded = () => {
     const token = localStorage.getItem('token');
-    fetchFiles(token);
+    fetchFiles(token, showFavorites);
+    Swal.fire({
+      title: 'Success!',
+      text: 'Your Java file has been uploaded and backed up.',
+      icon: 'success',
+      timer: 2000,
+      showConfirmButton: false,
+      background: '#064e3b',
+      color: '#d1fae5',
+    });
   };
 
   const handleDeleteFile = async (fileId) => {
@@ -58,11 +70,23 @@ export default function DashboardPage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        fetchFiles(token);
+        fetchFiles(token, showFavorites);
       }
     } catch (error) {
       console.error('Failed to delete file:', error);
     }
+  };
+
+  const handleFavoriteUpdate = () => {
+    const token = localStorage.getItem('token');
+    fetchFiles(token, showFavorites);
+  };
+
+  const toggleFavorites = () => {
+    const newState = !showFavorites;
+    setShowFavorites(newState);
+    const token = localStorage.getItem('token');
+    fetchFiles(token, newState);
   };
 
   const getSortedDates = () => {
@@ -92,7 +116,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen">
       <Navbar user={user} />
-
+      
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-emerald-100 mb-2">
@@ -105,20 +129,32 @@ export default function DashboardPage() {
           <FileUpload onFileUploaded={handleFileUploaded} />
         </div>
 
-        <div className="mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <SearchFilter 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             sortOrder={sortOrder}
             onSortChange={setSortOrder}
           />
+          
+          <button
+            onClick={toggleFavorites}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${showFavorites ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-400/30' : 'glass-button-secondary'}`}
+          >
+            <Star className={`w-4 h-4 ${showFavorites ? 'fill-current' : ''}`} />
+            {showFavorites ? 'Show All' : 'Favorites'}
+          </button>
         </div>
 
         {Object.keys(files).length === 0 ? (
           <div className="liquid-glass p-16 text-center">
             <FileCode className="w-16 h-16 text-emerald-400/30 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-emerald-200 mb-2">No files yet</h3>
-            <p className="text-emerald-300/50">Upload your first Java file to get started</p>
+            <h3 className="text-xl font-semibold text-emerald-200 mb-2">
+              {showFavorites ? 'No favorites yet' : 'No files yet'}
+            </h3>
+            <p className="text-emerald-300/50">
+              {showFavorites ? 'Star some files to see them here' : 'Upload your first Java file to get started'}
+            </p>
           </div>
         ) : (
           <div className="space-y-10">
@@ -132,7 +168,7 @@ export default function DashboardPage() {
                     {files[date].length} file{files[date].length !== 1 ? 's' : ''}
                   </span>
                 </div>
-
+                
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {getSortedFiles(files[date])
                     .filter(file => 
@@ -145,6 +181,7 @@ export default function DashboardPage() {
                         key={file.id} 
                         file={file} 
                         onDelete={() => handleDeleteFile(file.id)}
+                        onFavorite={handleFavoriteUpdate}
                       />
                     ))}
                 </div>

@@ -1,51 +1,27 @@
-import fs from 'fs';
-import path from 'path';
+// In-memory JSON database - persists per server instance
+// On Vercel: survives warm instances, resets on cold start
+// Use Export/Import in Settings to backup your data
 
-const DB_PATH = path.join(process.cwd(), 'data', 'database.json');
-
-const defaultDB = {
+let database = {
   users: [],
   files: [],
   sessions: []
 };
 
-function readDB() {
-  try {
-    if (!fs.existsSync(DB_PATH)) {
-      fs.writeFileSync(DB_PATH, JSON.stringify(defaultDB, null, 2));
-      return defaultDB;
-    }
-    const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('DB Read Error:', error);
-    return defaultDB;
-  }
-}
-
-function writeDB(db) {
-  try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-  } catch (error) {
-    console.error('DB Write Error:', error);
-  }
-}
-
 // User operations
 export function getUsers() {
-  return readDB().users;
+  return database.users;
 }
 
 export function getUserByUsername(username) {
-  return readDB().users.find(u => u.username.toLowerCase() === username.toLowerCase());
+  return database.users.find(u => u.username.toLowerCase() === username.toLowerCase());
 }
 
 export function getUserById(id) {
-  return readDB().users.find(u => u.id === id);
+  return database.users.find(u => u.id === id);
 }
 
 export function createUser(userData) {
-  const db = readDB();
   const newUser = {
     id: crypto.randomUUID(),
     ...userData,
@@ -59,18 +35,19 @@ export function createUser(userData) {
     totalCompiles: 0,
     lastActive: new Date().toISOString()
   };
-  db.users.push(newUser);
-  writeDB(db);
+  database.users.push(newUser);
   return newUser;
 }
 
 export function updateUser(id, updates) {
-  const db = readDB();
-  const index = db.users.findIndex(u => u.id === id);
+  const index = database.users.findIndex(u => u.id === id);
   if (index !== -1) {
-    db.users[index] = { ...db.users[index], ...updates, lastActive: new Date().toISOString() };
-    writeDB(db);
-    const { password, ...userWithoutPassword } = db.users[index];
+    database.users[index] = { 
+      ...database.users[index], 
+      ...updates, 
+      lastActive: new Date().toISOString() 
+    };
+    const { password, ...userWithoutPassword } = database.users[index];
     return userWithoutPassword;
   }
   return null;
@@ -78,15 +55,14 @@ export function updateUser(id, updates) {
 
 // File operations
 export function getFiles(userId) {
-  return readDB().files.filter(f => f.userId === userId);
+  return database.files.filter(f => f.userId === userId);
 }
 
 export function getFileById(id) {
-  return readDB().files.find(f => f.id === id);
+  return database.files.find(f => f.id === id);
 }
 
 export function createFile(fileData) {
-  const db = readDB();
   const newFile = {
     id: crypto.randomUUID(),
     ...fileData,
@@ -98,47 +74,44 @@ export function createFile(fileData) {
     isFavorite: false,
     tags: []
   };
-  db.files.push(newFile);
+  database.files.push(newFile);
   
-  const user = db.users.find(u => u.id === fileData.userId);
+  const user = database.users.find(u => u.id === fileData.userId);
   if (user) user.filesCount = (user.filesCount || 0) + 1;
   
-  writeDB(db);
   return newFile;
 }
 
 export function updateFile(id, updates) {
-  const db = readDB();
-  const index = db.files.findIndex(f => f.id === id);
+  const index = database.files.findIndex(f => f.id === id);
   if (index !== -1) {
-    db.files[index] = { ...db.files[index], ...updates, compiledAt: new Date().toISOString() };
+    database.files[index] = { 
+      ...database.files[index], 
+      ...updates, 
+      compiledAt: new Date().toISOString() 
+    };
     if (updates.status === 'compiled') {
-      db.files[index].compileCount = (db.files[index].compileCount || 0) + 1;
+      database.files[index].compileCount = (database.files[index].compileCount || 0) + 1;
     }
-    writeDB(db);
-    return db.files[index];
+    return database.files[index];
   }
   return null;
 }
 
 export function deleteFile(id) {
-  const db = readDB();
-  const file = db.files.find(f => f.id === id);
+  const file = database.files.find(f => f.id === id);
   if (file) {
-    const user = db.users.find(u => u.id === file.userId);
+    const user = database.users.find(u => u.id === file.userId);
     if (user) user.filesCount = Math.max(0, (user.filesCount || 0) - 1);
   }
-  db.files = db.files.filter(f => f.id !== id);
-  writeDB(db);
+  database.files = database.files.filter(f => f.id !== id);
 }
 
 export function toggleFavorite(id) {
-  const db = readDB();
-  const index = db.files.findIndex(f => f.id === id);
+  const index = database.files.findIndex(f => f.id === id);
   if (index !== -1) {
-    db.files[index].isFavorite = !db.files[index].isFavorite;
-    writeDB(db);
-    return db.files[index];
+    database.files[index].isFavorite = !database.files[index].isFavorite;
+    return database.files[index];
   }
   return null;
 }
@@ -191,4 +164,49 @@ export function getStats(userId) {
     lastUpload: files.length > 0 ? files[files.length - 1].uploadedAt : null,
     userSince: user?.createdAt
   };
+}
+
+// Public profile data (no sensitive info)
+export function getPublicProfile(username) {
+  const user = getUserByUsername(username);
+  if (!user) return null;
+  
+  const { password, ...safeUser } = user;
+  const files = getFiles(user.id);
+  
+  return {
+    ...safeUser,
+    stats: {
+      totalFiles: files.length,
+      compiledFiles: files.filter(f => f.status === 'compiled').length,
+      totalCompiles: files.reduce((acc, f) => acc + (f.compileCount || 0), 0),
+      favoriteFiles: files.filter(f => f.isFavorite).length,
+    },
+    recentFiles: files.slice(-5).map(f => ({
+      id: f.id,
+      title: f.title,
+      filename: f.filename,
+      uploadedAt: f.uploadedAt,
+      status: f.status,
+      compileCount: f.compileCount || 0
+    }))
+  };
+}
+
+// Backup / Restore
+export function exportDatabase() {
+  return JSON.stringify(database, null, 2);
+}
+
+export function importDatabase(jsonString) {
+  try {
+    const data = JSON.parse(jsonString);
+    if (data.users && data.files) {
+      database = data;
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }

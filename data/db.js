@@ -1,136 +1,143 @@
-// In-memory JSON database - persists per server instance
-// On Vercel: survives warm instances, resets on cold start
-// Use Export/Import in Settings to backup your data
-
-let database = {
-  users: [],
-  files: [],
-  sessions: []
-};
+import connectDB from '@/lib/mongodb';
+import User from '@/models/User';
+import File from '@/models/File';
 
 // User operations
-export function getUsers() {
-  return database.users;
+export async function getUsers() {
+  await connectDB();
+  return User.find().lean();
 }
 
-export function getUserByUsername(username) {
-  return database.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+export async function getUserByUsername(username) {
+  await connectDB();
+  return User.findOne({ username: username.toLowerCase() }).lean();
 }
 
-export function getUserById(id) {
-  return database.users.find(u => u.id === id);
+export async function getUserById(id) {
+  await connectDB();
+  return User.findById(id).lean();
 }
 
-export function createUser(userData) {
-  const newUser = {
-    id: crypto.randomUUID(),
+export async function createUser(userData) {
+  await connectDB();
+  const newUser = new User({
     ...userData,
+    username: userData.username.toLowerCase(),
     bio: '',
     avatar: '',
     role: 'student',
     theme: 'green',
     notifications: true,
-    createdAt: new Date().toISOString(),
     filesCount: 0,
     totalCompiles: 0,
-    lastActive: new Date().toISOString()
-  };
-  database.users.push(newUser);
-  return newUser;
+    createdAt: new Date(),
+    lastActive: new Date()
+  });
+  await newUser.save();
+  return newUser.toObject();
 }
 
-export function updateUser(id, updates) {
-  const index = database.users.findIndex(u => u.id === id);
-  if (index !== -1) {
-    database.users[index] = { 
-      ...database.users[index], 
-      ...updates, 
-      lastActive: new Date().toISOString() 
-    };
-    const { password, ...userWithoutPassword } = database.users[index];
-    return userWithoutPassword;
-  }
-  return null;
+export async function updateUser(id, updates) {
+  await connectDB();
+  const user = await User.findByIdAndUpdate(
+    id,
+    { ...updates, lastActive: new Date() },
+    { new: true }
+  ).lean();
+  
+  if (!user) return null;
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
 }
 
 // File operations
-export function getFiles(userId) {
-  return database.files.filter(f => f.userId === userId);
+export async function getFiles(userId) {
+  await connectDB();
+  return File.find({ userId }).sort({ uploadedAt: -1 }).lean();
 }
 
-export function getFileById(id) {
-  return database.files.find(f => f.id === id);
+export async function getFileById(id) {
+  await connectDB();
+  return File.findById(id).lean();
 }
 
-export function createFile(fileData) {
-  const newFile = {
-    id: crypto.randomUUID(),
+export async function createFile(fileData) {
+  await connectDB();
+  const newFile = new File({
     ...fileData,
-    uploadedAt: new Date().toISOString(),
-    compiledAt: null,
-    output: null,
     status: 'pending',
     compileCount: 0,
     isFavorite: false,
-    tags: []
-  };
-  database.files.push(newFile);
+    tags: [],
+    uploadedAt: new Date(),
+    compiledAt: null
+  });
+  await newFile.save();
   
-  const user = database.users.find(u => u.id === fileData.userId);
-  if (user) user.filesCount = (user.filesCount || 0) + 1;
+  // Update user file count
+  await User.findByIdAndUpdate(fileData.userId, {
+    $inc: { filesCount: 1 }
+  });
   
-  return newFile;
+  return newFile.toObject();
 }
 
-export function updateFile(id, updates) {
-  const index = database.files.findIndex(f => f.id === id);
-  if (index !== -1) {
-    database.files[index] = { 
-      ...database.files[index], 
-      ...updates, 
-      compiledAt: new Date().toISOString() 
-    };
-    if (updates.status === 'compiled') {
-      database.files[index].compileCount = (database.files[index].compileCount || 0) + 1;
-    }
-    return database.files[index];
+export async function updateFile(id, updates) {
+  await connectDB();
+  const file = await File.findByIdAndUpdate(
+    id,
+    { ...updates, compiledAt: new Date() },
+    { new: true }
+  ).lean();
+  
+  if (file && updates.status === 'compiled') {
+    await File.findByIdAndUpdate(id, { $inc: { compileCount: 1 } });
+    file.compileCount = (file.compileCount || 0) + 1;
   }
-  return null;
+  
+  return file;
 }
 
-export function deleteFile(id) {
-  const file = database.files.find(f => f.id === id);
+export async function deleteFile(id) {
+  await connectDB();
+  const file = await File.findById(id).lean();
   if (file) {
-    const user = database.users.find(u => u.id === file.userId);
-    if (user) user.filesCount = Math.max(0, (user.filesCount || 0) - 1);
+    await User.findByIdAndUpdate(file.userId, {
+      $inc: { filesCount: -1 }
+    });
+    await File.findByIdAndDelete(id);
   }
-  database.files = database.files.filter(f => f.id !== id);
 }
 
-export function toggleFavorite(id) {
-  const index = database.files.findIndex(f => f.id === id);
-  if (index !== -1) {
-    database.files[index].isFavorite = !database.files[index].isFavorite;
-    return database.files[index];
-  }
-  return null;
+export async function toggleFavorite(id) {
+  await connectDB();
+  const file = await File.findById(id).lean();
+  if (!file) return null;
+  
+  const updated = await File.findByIdAndUpdate(
+    id,
+    { isFavorite: !file.isFavorite },
+    { new: true }
+  ).lean();
+  
+  return updated;
 }
 
-export function searchFiles(userId, query) {
-  const files = getFiles(userId);
+export async function searchFiles(userId, query) {
+  const files = await getFiles(userId);
   if (!query) return files;
   
   const lowerQuery = query.toLowerCase();
   return files.filter(f => 
     f.title.toLowerCase().includes(lowerQuery) ||
     f.filename.toLowerCase().includes(lowerQuery) ||
-    f.uploadedAt.includes(query) ||
+    f.uploadedAt.toString().includes(query) ||
     (f.tags && f.tags.some(tag => tag.toLowerCase().includes(lowerQuery)))
   );
 }
 
-export function getFilesByDate(userId) {
-  const files = getFiles(userId);
+export async function getFilesByDate(userId) {
+  const files = await getFiles(userId);
   const grouped = {};
   
   files.forEach(file => {
@@ -146,14 +153,14 @@ export function getFilesByDate(userId) {
   return Object.entries(grouped)
     .sort((a, b) => new Date(b[0]) - new Date(a[0]))
     .reduce((acc, [date, files]) => {
-      acc[date] = files.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      acc[date] = files;
       return acc;
     }, {});
 }
 
-export function getStats(userId) {
-  const files = getFiles(userId);
-  const user = getUserById(userId);
+export async function getStats(userId) {
+  const files = await getFiles(userId);
+  const user = await getUserById(userId);
   
   return {
     totalFiles: files.length,
@@ -167,23 +174,28 @@ export function getStats(userId) {
 }
 
 // Public profile data (no sensitive info)
-export function getPublicProfile(username) {
-  const user = getUserByUsername(username);
+export async function getPublicProfile(username) {
+  await connectDB();
+  const user = await User.findOne({ username: username.toLowerCase() }).lean();
   if (!user) return null;
   
   const { password, ...safeUser } = user;
-  const files = getFiles(user.id);
+  const files = await File.find({ userId: user._id.toString() })
+    .sort({ uploadedAt: -1 })
+    .limit(5)
+    .lean();
   
   return {
     ...safeUser,
+    id: user._id.toString(),
     stats: {
-      totalFiles: files.length,
-      compiledFiles: files.filter(f => f.status === 'compiled').length,
+      totalFiles: await File.countDocuments({ userId: user._id.toString() }),
+      compiledFiles: await File.countDocuments({ userId: user._id.toString(), status: 'compiled' }),
       totalCompiles: files.reduce((acc, f) => acc + (f.compileCount || 0), 0),
-      favoriteFiles: files.filter(f => f.isFavorite).length,
+      favoriteFiles: await File.countDocuments({ userId: user._id.toString(), isFavorite: true }),
     },
-    recentFiles: files.slice(-5).map(f => ({
-      id: f.id,
+    recentFiles: files.map(f => ({
+      id: f._id.toString(),
       title: f.title,
       filename: f.filename,
       uploadedAt: f.uploadedAt,
@@ -194,19 +206,39 @@ export function getPublicProfile(username) {
 }
 
 // Backup / Restore
-export function exportDatabase() {
-  return JSON.stringify(database, null, 2);
+export async function exportDatabase() {
+  await connectDB();
+  const users = await User.find().lean();
+  const files = await File.find().lean();
+  
+  return JSON.stringify({
+    users: users.map(u => ({ ...u, _id: u._id.toString() })),
+    files: files.map(f => ({ ...f, _id: f._id.toString(), userId: f.userId.toString?.() || f.userId }))
+  }, null, 2);
 }
 
-export function importDatabase(jsonString) {
+export async function importDatabase(jsonString) {
   try {
     const data = JSON.parse(jsonString);
-    if (data.users && data.files) {
-      database = data;
-      return true;
+    if (!data.users || !data.files) return false;
+    
+    await connectDB();
+    await User.deleteMany({});
+    await File.deleteMany({});
+    
+    for (const user of data.users) {
+      delete user._id;
+      await User.create(user);
     }
-    return false;
-  } catch {
+    
+    for (const file of data.files) {
+      delete file._id;
+      await File.create(file);
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('Import error:', e);
     return false;
   }
 }

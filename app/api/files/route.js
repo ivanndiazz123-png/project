@@ -1,46 +1,121 @@
 import { NextResponse } from 'next/server';
-import { createFile, getFilesByDate, deleteFile, getFileById, toggleFavorite } from '@/data/db';
-import { getAuthUser } from '@/lib/auth';
+import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 
-export const dynamic = 'force-dynamic';
+const JWT_SECRET = process.env.JWT_SECRET || 'java-backup-console-secret-key-2024';
+const MONGODB_URI = process.env.MONGODB_URI;
 
-function isValidId(id) {
-  return id && id !== 'undefined' && id !== 'null' && typeof id === 'string' && id.length > 0;
+let cached = global.mongoose;
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) return cached.conn;
+  
+  const getConnectionString = () => {
+    if (MONGODB_URI.includes('/javabackup')) return MONGODB_URI;
+    if (MONGODB_URI.includes('?')) return MONGODB_URI.replace('?', '/javabackup?');
+    return MONGODB_URI + '/javabackup';
+  };
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(getConnectionString(), {
+      bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+    }).then(m => m);
+  }
+  
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+
+const FileSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  filename: { type: String, required: true },
+  content: { type: String, required: true },
+  size: { type: Number, default: 0 },
+  status: { type: String, default: 'pending' },
+  output: { type: mongoose.Schema.Types.Mixed, default: null },
+  compileCount: { type: Number, default: 0 },
+  isFavorite: { type: Boolean, default: false },
+  tags: [{ type: String }],
+  uploadedAt: { type: Date, default: Date.now },
+  compiledAt: { type: Date, default: null }
+});
+
+const UserSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  nickname: { type: String, required: true },
+  password: { type: String, required: true },
+  filesCount: { type: Number, default: 0 },
+});
+
+async function getModels() {
+  await connectDB();
+  const File = mongoose.models.File || mongoose.model('File', FileSchema);
+  const User = mongoose.models.User || mongoose.model('User', UserSchema);
+  return { File, User };
+}
+
+function getAuthUser(request) {
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  
+  try {
+    return jwt.verify(authHeader.substring(7), JWT_SECRET);
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(request) {
   const user = getAuthUser(request);
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const favoritesOnly = searchParams.get('favorites') === 'true';
+  try {
+    const { File } = await getModels();
+    const { searchParams } = new URL(request.url);
+    const favoritesOnly = searchParams.get('favorites') === 'true';
 
-  const files = await getFilesByDate(user.userId);
-  
-  if (favoritesOnly) {
-    const filtered = {};
-    Object.entries(files).forEach(([date, fileList]) => {
-      const favs = fileList.filter(f => f.isFavorite);
-      if (favs.length > 0) filtered[date] = favs;
+    const files = await File.find({ userId: user.userId }).sort({ uploadedAt: -1 }).lean();
+    
+    if (favoritesOnly) {
+      const filtered = {};
+      files.filter(f => f.isFavorite).forEach(file => {
+        const date = new Date(file.uploadedAt).toLocaleDateString('en-US', {
+          year: 'numeric', month: 'long', day: 'numeric'
+        });
+        if (!filtered[date]) filtered[date] = [];
+        filtered[date].push(file);
+      });
+      return NextResponse.json({ success: true, files: filtered });
+    }
+
+    const grouped = {};
+    files.forEach(file => {
+      const date = new Date(file.uploadedAt).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(file);
     });
-    return NextResponse.json({ success: true, files: filtered });
-  }
 
-  return NextResponse.json({ success: true, files });
+    return NextResponse.json({ success: true, files: grouped });
+  } catch (error) {
+    console.error('Files GET error:', error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
 }
 
 export async function POST(request) {
   const user = getAuthUser(request);
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -54,7 +129,9 @@ export async function POST(request) {
       );
     }
 
-    const file = await createFile({
+    const { File, User } = await getModels();
+    
+    const newFile = new File({
       userId: user.userId,
       title,
       filename,
@@ -63,88 +140,78 @@ export async function POST(request) {
       status: 'pending',
       tags: tags || []
     });
+    
+    await newFile.save();
+    await User.findByIdAndUpdate(user.userId, { $inc: { filesCount: 1 } });
 
-    return NextResponse.json({ success: true, file });
+    return NextResponse.json({ success: true, file: newFile.toObject() });
   } catch (error) {
-    console.error('File upload error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Upload failed: ' + error.message },
-      { status: 500 }
-    );
+    console.error('Files POST error:', error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
 
 export async function DELETE(request) {
   const user = getAuthUser(request);
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
 
-  if (!isValidId(id)) {
-    return NextResponse.json(
-      { success: false, message: 'Valid File ID required' },
-      { status: 400 }
-    );
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'File ID required' }, { status: 400 });
+    }
+
+    const { File, User } = await getModels();
+    const file = await File.findById(id).lean();
+    
+    if (!file || file.userId !== user.userId) {
+      return NextResponse.json({ success: false, message: 'File not found' }, { status: 404 });
+    }
+
+    await User.findByIdAndUpdate(file.userId, { $inc: { filesCount: -1 } });
+    await File.findByIdAndDelete(id);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Files DELETE error:', error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
-
-  const file = await getFileById(id);
-  if (!file || file.userId !== user.userId) {
-    return NextResponse.json(
-      { success: false, message: 'File not found' },
-      { status: 404 }
-    );
-  }
-
-  await deleteFile(id);
-  return NextResponse.json({ success: true });
 }
 
 export async function PATCH(request) {
   const user = getAuthUser(request);
   if (!user) {
-    return NextResponse.json(
-      { success: false, message: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const body = await request.json();
     const { fileId, action } = body;
 
-    if (!isValidId(fileId)) {
-      return NextResponse.json(
-        { success: false, message: 'Valid File ID required' },
-        { status: 400 }
-      );
-    }
-
     if (action === 'favorite') {
-      const file = await toggleFavorite(fileId);
+      const { File } = await getModels();
+      const file = await File.findById(fileId).lean();
+      
       if (!file) {
-        return NextResponse.json(
-          { success: false, message: 'File not found' },
-          { status: 404 }
-        );
+        return NextResponse.json({ success: false, message: 'File not found' }, { status: 404 });
       }
-      return NextResponse.json({ success: true, file });
+
+      const updated = await File.findByIdAndUpdate(
+        fileId,
+        { isFavorite: !file.isFavorite },
+        { new: true }
+      ).lean();
+
+      return NextResponse.json({ success: true, file: updated });
     }
 
-    return NextResponse.json(
-      { success: false, message: 'Invalid action' },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error('File patch error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Update failed' },
-      { status: 500 }
-    );
+    console.error('Files PATCH error:', error);
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --glass-bg: rgba(6, 78, 59, 0.15);
+    --glass-border: rgba(52, 211, 153, 0.2);
+    --glass-highlight: rgba(52, 211, 153, 0.1);
+  }
+
+  body {
+    @apply bg-emerald-950 text-emerald-50 font-sans antialiased;
+    background-image: 
+      radial-gradient(ellipse at 20% 50%, rgba(22, 163, 74, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(5, 150, 105, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse at 40% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 50%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-xl bg-emerald-900/20 border border-emerald-400/20 rounded-2xl;
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(52, 211, 153, 0.1);
+  }
+
+  .glass-card {
+    @apply backdrop-blur-lg bg-emerald-800/10 border border-emerald-400/15 rounded-xl;
+    box-shadow: 
+      0 4px 24px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(52, 211, 153, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card:hover {
+    @apply bg-emerald-800/20 border-emerald-400/30;
+    transform: translateY(-2px);
+    box-shadow: 
+      0 12px 40px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(52, 211, 153, 0.1),
+      inset 0 1px 0 rgba(52, 211, 153, 0.15);
+  }
+
+  .glass-input {
+    @apply backdrop-blur-sm bg-emerald-900/30 border border-emerald-400/20 rounded-lg px-4 py-3 text-emerald-100 placeholder-emerald-400/50 focus:outline-none focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/20 transition-all duration-200;
+  }
+
+  .glass-button {
+    @apply backdrop-blur-sm bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-400/30 rounded-lg px-6 py-3 font-medium text-white transition-all duration-200;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+  }
+
+  .glass-button:hover {
+    box-shadow: 0 6px 25px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .glass-button-secondary {
+    @apply backdrop-blur-sm bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-400/20 rounded-lg px-6 py-3 font-medium text-emerald-200 transition-all duration-200;
+  }
+
+  .liquid-glass {
+    @apply backdrop-blur-2xl bg-gradient-to-br from-emerald-800/20 via-emerald-900/30 to-emerald-950/40 border border-emerald-400/20 rounded-2xl;
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.1);
+  }
+
+  .console-output {
+    @apply font-mono text-sm leading-relaxed;
+    background: linear-gradient(180deg, rgba(6, 78, 59, 0.9) 0%, rgba(2, 44, 34, 0.95) 100%);
+  }
+
+  .scrollbar-green::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-green::-webkit-scrollbar-track {
+    @apply bg-emerald-950/50 rounded-full;
+  }
+
+  .scrollbar-green::-webkit-scrollbar-thumb {
+    @apply bg-emerald-600/50 rounded-full;
+  }
+
+  .scrollbar-green::-webkit-scrollbar-thumb:hover {
+    @apply bg-emerald-500/70;
+  }
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+  }
+
+  .border-glow {
+    box-shadow: 0 0 15px rgba(52, 211, 153, 0.15);
+  }
+}

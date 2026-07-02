@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createUser, getUserByUsername } from '@/data/db';
+import { createUser, getUserByUsername, updateUser } from '@/data/db';
 import { hashPassword, verifyPassword, generateToken } from '@/lib/auth';
 
 export async function POST(request) {
@@ -48,6 +48,8 @@ export async function POST(request) {
           { status: 401 }
         );
       }
+
+      updateUser(user.id, { lastActive: new Date().toISOString() });
 
       const token = generateToken(user);
       const { password: _, ...userWithoutPassword } = user;

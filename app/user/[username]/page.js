@@ -12,7 +12,7 @@ import {
   ArrowLeft,
   Loader2,
   Terminal,
-  CheckCircle,
+  CheckCircle2,
   GraduationCap,
   BookOpen,
   Shield
@@ -124,7 +124,7 @@ export default function PublicProfilePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatBox icon={FileCode} label="Files" value={profile?.stats?.totalFiles || 0} />
-            <StatBox icon={CheckCircle} label="Compiled" value={profile?.stats?.compiledFiles || 0} />
+            <StatBox icon={CheckCircle2} label="Compiled" value={profile?.stats?.compiledFiles || 0} />
             <StatBox icon={Play} label="Runs" value={profile?.stats?.totalCompiles || 0} />
             <StatBox icon={Star} label="Favorites" value={profile?.stats?.favoriteFiles || 0} />
           </div>

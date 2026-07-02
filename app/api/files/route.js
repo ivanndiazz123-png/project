@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createFile, getFilesByDate, deleteFile, getFileById, toggleFavorite } from '@/data/db';
 import { getAuthUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
+function isValidId(id) {
+  return id && id !== 'undefined' && id !== 'null' && typeof id === 'string' && id.length > 0;
+}
+
 export async function GET(request) {
   const user = getAuthUser(request);
   if (!user) {
@@ -14,7 +20,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const favoritesOnly = searchParams.get('favorites') === 'true';
 
-  let files = getFilesByDate(user.userId);
+  const files = await getFilesByDate(user.userId);
   
   if (favoritesOnly) {
     const filtered = {};
@@ -22,7 +28,7 @@ export async function GET(request) {
       const favs = fileList.filter(f => f.isFavorite);
       if (favs.length > 0) filtered[date] = favs;
     });
-    files = filtered;
+    return NextResponse.json({ success: true, files: filtered });
   }
 
   return NextResponse.json({ success: true, files });
@@ -48,7 +54,7 @@ export async function POST(request) {
       );
     }
 
-    const file = createFile({
+    const file = await createFile({
       userId: user.userId,
       title,
       filename,
@@ -62,7 +68,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('File upload error:', error);
     return NextResponse.json(
-      { success: false, message: 'Upload failed' },
+      { success: false, message: 'Upload failed: ' + error.message },
       { status: 500 }
     );
   }
@@ -80,14 +86,14 @@ export async function DELETE(request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
 
-  if (!id) {
+  if (!isValidId(id)) {
     return NextResponse.json(
-      { success: false, message: 'File ID required' },
+      { success: false, message: 'Valid File ID required' },
       { status: 400 }
     );
   }
 
-  const file = getFileById(id);
+  const file = await getFileById(id);
   if (!file || file.userId !== user.userId) {
     return NextResponse.json(
       { success: false, message: 'File not found' },
@@ -95,7 +101,7 @@ export async function DELETE(request) {
     );
   }
 
-  deleteFile(id);
+  await deleteFile(id);
   return NextResponse.json({ success: true });
 }
 
@@ -112,8 +118,15 @@ export async function PATCH(request) {
     const body = await request.json();
     const { fileId, action } = body;
 
+    if (!isValidId(fileId)) {
+      return NextResponse.json(
+        { success: false, message: 'Valid File ID required' },
+        { status: 400 }
+      );
+    }
+
     if (action === 'favorite') {
-      const file = toggleFavorite(fileId);
+      const file = await toggleFavorite(fileId);
       if (!file) {
         return NextResponse.json(
           { success: false, message: 'File not found' },

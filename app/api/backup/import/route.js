@@ -13,7 +13,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const success = importDatabase(body.data);
+    const success = await importDatabase(body.data);
     
     if (success) {
       return NextResponse.json({ success: true, message: 'Data restored successfully' });
@@ -25,7 +25,7 @@ export async function POST(request) {
     }
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: 'Import failed' },
+      { success: false, message: 'Import failed: ' + error.message },
       { status: 500 }
     );
   }

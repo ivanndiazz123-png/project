@@ -34,7 +34,7 @@ export async function PUT(request) {
 
   try {
     const body = await request.json();
-    const { nickname, bio, avatar, currentPassword, newPassword } = body;
+    const { nickname, bio, currentPassword, newPassword } = body;
 
     const userData = getUserById(user.userId);
     if (!userData) {
@@ -48,12 +48,11 @@ export async function PUT(request) {
 
     if (nickname !== undefined) updates.nickname = nickname;
     if (bio !== undefined) updates.bio = bio;
-    if (avatar !== undefined) updates.avatar = avatar;
 
-    if (newPassword) {
-      if (!currentPassword) {
+    if (newPassword && newPassword.length > 0) {
+      if (!currentPassword || currentPassword.length === 0) {
         return NextResponse.json(
-          { success: false, message: 'Current password is required' },
+          { success: false, message: 'Current password is required to change password' },
           { status: 400 }
         );
       }
@@ -62,6 +61,13 @@ export async function PUT(request) {
       if (!isValid) {
         return NextResponse.json(
           { success: false, message: 'Current password is incorrect' },
+          { status: 400 }
+        );
+      }
+
+      if (newPassword.length < 6) {
+        return NextResponse.json(
+          { success: false, message: 'New password must be at least 6 characters' },
           { status: 400 }
         );
       }
@@ -79,7 +85,7 @@ export async function PUT(request) {
   } catch (error) {
     console.error('Profile update error:', error);
     return NextResponse.json(
-      { success: false, message: 'Update failed' },
+      { success: false, message: 'Update failed: ' + error.message },
       { status: 500 }
     );
   }

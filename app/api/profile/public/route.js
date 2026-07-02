@@ -1,20 +1,33 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PUT,DELETE,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-    ];
-  },
-};
+import { NextResponse } from 'next/server';
+import { getPublicProfile } from '@/data/db';
 
-module.exports = nextConfig;
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get('username');
+
+    if (!username) {
+      return NextResponse.json(
+        { success: false, message: 'Username required' },
+        { status: 400 }
+      );
+    }
+
+    const profile = getPublicProfile(username);
+    
+    if (!profile) {
+      return NextResponse.json(
+        { success: false, message: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, profile });
+  } catch (error) {
+    console.error('Public profile error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Server error' },
+      { status: 500 }
+    );
+  }
+}

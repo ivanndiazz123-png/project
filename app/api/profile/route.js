@@ -11,7 +11,7 @@ export async function GET(request) {
     );
   }
 
-  const userData = getUserById(user.userId);
+  const userData = await getUserById(user.userId);
   if (!userData) {
     return NextResponse.json(
       { success: false, message: 'User not found' },
@@ -36,7 +36,7 @@ export async function PUT(request) {
     const body = await request.json();
     const { nickname, bio, currentPassword, newPassword } = body;
 
-    const userData = getUserById(user.userId);
+    const userData = await getUserById(user.userId);
     if (!userData) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
@@ -75,7 +75,7 @@ export async function PUT(request) {
       updates.password = await hashPassword(newPassword);
     }
 
-    const updatedUser = updateUser(user.userId, updates);
+    const updatedUser = await updateUser(user.userId, updates);
 
     return NextResponse.json({
       success: true,

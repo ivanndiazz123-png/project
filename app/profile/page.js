@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import Navbar from '@/components/Navbar';
 import { 
   User, 
-  Mail, 
   Shield, 
   Save, 
   Loader2, 
@@ -20,7 +19,10 @@ import {
   BookOpen,
   GraduationCap,
   Code2,
-  Clock
+  Clock,
+  Check,
+  Star,
+  BarChart3
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -49,7 +51,14 @@ export default function ProfilePage() {
       return;
     }
     
-    setUser(JSON.parse(userData));
+    try {
+      const parsed = JSON.parse(userData);
+      setUser(parsed);
+    } catch {
+      router.push('/login');
+      return;
+    }
+    
     fetchProfile(token);
     fetchStats(token);
   }, [router]);
@@ -60,7 +69,7 @@ export default function ProfilePage() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.user) {
         setProfile(data.user);
         setFormData(prev => ({
           ...prev,
@@ -97,6 +106,19 @@ export default function ProfilePage() {
         icon: 'error',
         background: '#064e3b',
         color: '#d1fae5',
+        confirmButtonColor: '#059669',
+      });
+      return;
+    }
+
+    if (formData.newPassword && formData.newPassword.length < 6) {
+      Swal.fire({
+        title: 'Error',
+        text: 'New password must be at least 6 characters',
+        icon: 'error',
+        background: '#064e3b',
+        color: '#d1fae5',
+        confirmButtonColor: '#059669',
       });
       return;
     }
@@ -110,7 +132,7 @@ export default function ProfilePage() {
         bio: formData.bio,
       };
 
-      if (formData.newPassword) {
+      if (formData.newPassword && formData.newPassword.length > 0) {
         body.currentPassword = formData.currentPassword;
         body.newPassword = formData.newPassword;
       }
@@ -126,7 +148,7 @@ export default function ProfilePage() {
 
       const data = await res.json();
 
-      if (data.success) {
+      if (data.success && data.user) {
         setProfile(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
@@ -149,6 +171,7 @@ export default function ProfilePage() {
           icon: 'error',
           background: '#064e3b',
           color: '#d1fae5',
+          confirmButtonColor: '#059669',
         });
       }
     } catch (error) {
@@ -159,12 +182,14 @@ export default function ProfilePage() {
   };
 
   const getRoleBadge = () => {
+    if (!profile || !profile.role) return null;
+    
     const roles = {
       student: { color: 'bg-blue-500/20 text-blue-300 border-blue-400/30', icon: GraduationCap },
       teacher: { color: 'bg-purple-500/20 text-purple-300 border-purple-400/30', icon: BookOpen },
       admin: { color: 'bg-red-500/20 text-red-300 border-red-400/30', icon: Shield },
     };
-    const role = profile?.role || 'student';
+    const role = profile.role;
     const config = roles[role] || roles.student;
     const Icon = config.icon;
     
@@ -174,6 +199,19 @@ export default function ProfilePage() {
         {role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
+  };
+
+  const getCompilationRate = () => {
+    if (!stats || !stats.totalFiles || stats.totalFiles === 0) return '0%';
+    const rate = ((stats.compiledFiles || 0) / stats.totalFiles) * 100;
+    return `${Math.round(rate)}%`;
+  };
+
+  const getStoragePercent = () => {
+    if (!stats || !stats.totalSize) return 0;
+    const kb = stats.totalSize / 1024;
+    const maxKb = 10 * 1024;
+    return Math.min((kb / maxKb) * 100, 100);
   };
 
   if (loading) {
@@ -195,9 +233,7 @@ export default function ProfilePage() {
         </h1>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Profile Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Profile Card */}
             <div className="liquid-glass p-8">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-4">
@@ -205,8 +241,8 @@ export default function ProfilePage() {
                     <User className="w-10 h-10 text-emerald-400" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-emerald-100">{profile?.nickname}</h2>
-                    <p className="text-emerald-400/60">@{profile?.username}</p>
+                    <h2 className="text-2xl font-bold text-emerald-100">{profile?.nickname || 'User'}</h2>
+                    <p className="text-emerald-400/60">@{profile?.username || 'username'}</p>
                     <div className="mt-2">{getRoleBadge()}</div>
                   </div>
                 </div>
@@ -312,7 +348,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Suggestions Card */}
             <div className="liquid-glass p-8">
               <h3 className="text-lg font-semibold text-emerald-100 mb-4 flex items-center gap-2">
                 <Award className="w-5 h-5 text-emerald-400" />
@@ -334,11 +369,10 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Right Column - Stats */}
           <div className="space-y-6">
             <div className="liquid-glass p-6">
               <h3 className="text-lg font-semibold text-emerald-100 mb-6 flex items-center gap-2">
-                <Code2 className="w-5 h-5 text-emerald-400" />
+                <BarChart3 className="w-5 h-5 text-emerald-400" />
                 Your Stats
               </h3>
               
@@ -350,7 +384,7 @@ export default function ProfilePage() {
                   color="text-emerald-400"
                 />
                 <StatItem 
-                  icon={CheckIcon} 
+                  icon={Check} 
                   label="Compiled" 
                   value={stats?.compiledFiles || 0} 
                   color="text-emerald-400"
@@ -372,20 +406,19 @@ export default function ProfilePage() {
               <div className="mt-6 pt-6 border-t border-emerald-400/10">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-emerald-400 mb-1">
-                    {stats?.totalFiles ? ((stats.compiledFiles / stats.totalFiles) * 100).toFixed(0) : 0}%
+                    {getCompilationRate()}
                   </div>
                   <p className="text-xs text-emerald-400/50">Compilation Rate</p>
                 </div>
               </div>
             </div>
 
-            {/* Storage Info */}
             <div className="liquid-glass p-6">
               <h3 className="text-sm font-semibold text-emerald-200 mb-4">Storage Usage</h3>
               <div className="w-full h-3 rounded-full bg-emerald-900/50 overflow-hidden">
                 <div 
                   className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(((stats?.totalSize || 0) / (1024 * 1024)) * 100, 100)}%` }}
+                  style={{ width: `${getStoragePercent()}%` }}
                 />
               </div>
               <p className="text-xs text-emerald-400/50 mt-2">
@@ -408,14 +441,6 @@ function StatItem({ icon: Icon, label, value, color }) {
       </div>
       <span className="text-lg font-bold text-emerald-100">{value}</span>
     </div>
-  );
-}
-
-function CheckIcon(props) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6 9 17l-5-5"/>
-    </svg>
   );
 }
 

@@ -64,6 +64,10 @@
     @apply backdrop-blur-sm bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-400/20 rounded-lg px-6 py-3 font-medium text-emerald-200 transition-all duration-200;
   }
 
+  .glass-button-danger {
+    @apply backdrop-blur-sm bg-red-600/20 hover:bg-red-500/30 border border-red-400/30 rounded-lg px-6 py-3 font-medium text-red-200 transition-all duration-200;
+  }
+
   .liquid-glass {
     @apply backdrop-blur-2xl bg-gradient-to-br from-emerald-800/20 via-emerald-900/30 to-emerald-950/40 border border-emerald-400/20 rounded-2xl;
     box-shadow: 
@@ -75,6 +79,11 @@
   .console-output {
     @apply font-mono text-sm leading-relaxed;
     background: linear-gradient(180deg, rgba(6, 78, 59, 0.9) 0%, rgba(2, 44, 34, 0.95) 100%);
+  }
+
+  .code-block {
+    @apply font-mono text-sm leading-relaxed;
+    background: linear-gradient(180deg, rgba(6, 78, 59, 0.95) 0%, rgba(2, 44, 34, 0.98) 100%);
   }
 
   .scrollbar-green::-webkit-scrollbar {
@@ -92,6 +101,36 @@
   .scrollbar-green::-webkit-scrollbar-thumb:hover {
     @apply bg-emerald-500/70;
   }
+
+  .swal2-popup {
+    @apply backdrop-blur-2xl bg-emerald-900/95 border border-emerald-400/20 !important;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  .swal2-title {
+    @apply text-emerald-100 !important;
+  }
+
+  .swal2-html-container {
+    @apply text-emerald-300/80 !important;
+  }
+
+  .swal2-confirm {
+    @apply bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/30 !important;
+  }
+
+  .swal2-cancel {
+    @apply bg-emerald-800/50 hover:bg-emerald-700/50 border border-emerald-400/20 text-emerald-200 !important;
+  }
+
+  .swal2-input {
+    @apply bg-emerald-900/50 border border-emerald-400/20 text-emerald-100 !important;
+  }
+
+  .swal2-input:focus {
+    @apply border-emerald-400/50 ring-2 ring-emerald-400/20 !important;
+    box-shadow: none !important;
+  }
 }
 
 @layer utilities {
@@ -101,5 +140,14 @@
 
   .border-glow {
     box-shadow: 0 0 15px rgba(52, 211, 153, 0.15);
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
   }
 }

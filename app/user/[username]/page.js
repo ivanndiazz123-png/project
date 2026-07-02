@@ -20,13 +20,17 @@ import {
 
 export default function PublicProfilePage() {
   const params = useParams();
-  const username = params.username;
+  const username = params?.username;
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!username) return;
+    if (!username) {
+      setError('No username provided');
+      setLoading(false);
+      return;
+    }
     fetchProfile();
   }, [username]);
 
@@ -40,6 +44,7 @@ export default function PublicProfilePage() {
         setError(data.message || 'User not found');
       }
     } catch (err) {
+      console.error('Fetch profile error:', err);
       setError('Failed to load profile');
     } finally {
       setLoading(false);
@@ -65,7 +70,7 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-emerald-950">
         <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
       </div>
     );
@@ -73,7 +78,7 @@ export default function PublicProfilePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="min-h-screen flex items-center justify-center px-6 bg-emerald-950">
         <div className="liquid-glass p-10 text-center max-w-md w-full">
           <User className="w-16 h-16 text-emerald-400/30 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-emerald-100 mb-2">User Not Found</h2>
@@ -88,7 +93,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-emerald-950">
       <nav className="sticky top-0 z-50 border-b border-emerald-400/10 backdrop-blur-xl bg-emerald-950/70">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
@@ -110,8 +115,8 @@ export default function PublicProfilePage() {
               <User className="w-12 h-12 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-emerald-100">{profile?.nickname}</h1>
-              <p className="text-emerald-400/60 mt-1">@{profile?.username}</p>
+              <h1 className="text-3xl font-bold text-emerald-100">{profile?.nickname || 'Unknown'}</h1>
+              <p className="text-emerald-400/60 mt-1">@{profile?.username || username}</p>
               <div className="mt-3">{getRoleBadge(profile?.role || 'student')}</div>
             </div>
           </div>
